@@ -47,7 +47,7 @@ public class MasterSlaveReactor {
         new Thread(subReactors[1]).start();
     }
 
-    private class AcceptorHandler implements Runnable {
+    class AcceptorHandler implements Runnable {
         @Override
         public void run() {
             try {
@@ -63,7 +63,7 @@ public class MasterSlaveReactor {
         }
     }
 
-    private class SubReactor implements Runnable {
+    class SubReactor implements Runnable {
         private final Selector selector;
 
         public SubReactor(Selector selector) {

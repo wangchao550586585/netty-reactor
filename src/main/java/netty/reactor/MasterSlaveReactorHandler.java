@@ -34,14 +34,21 @@ public class MasterSlaveReactorHandler implements Runnable {
     public MasterSlaveReactorHandler(Selector selector, SocketChannel socketChannel) throws IOException {
         this.socketChannel = socketChannel;
         this.socketChannel.configureBlocking(false);
-        sk = this.socketChannel.register(selector, 0);
-        sk.attach(this);
-        sk.interestOps(SelectionKey.OP_READ);
+        this.sk = this.socketChannel.register(selector, 0);
+        this.sk.attach(this);
+        this.sk.interestOps(SelectionKey.OP_READ);
         selector.wakeup();
     }
 
     @Override
     public void run() {
+            threadPoolExecutor.execute(new AsyncTask());
+    }
 
+    class AsyncTask implements Runnable {
+        @Override
+        public void run() {
+
+        }
     }
 }
