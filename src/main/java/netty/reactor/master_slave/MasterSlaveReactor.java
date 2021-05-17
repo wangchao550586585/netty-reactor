@@ -29,20 +29,20 @@ public class MasterSlaveReactor {
 
 
     public MasterSlaveReactor() throws IOException {
+        //一个反应堆对应一个子选择器
+        selectors[0] = Selector.open();
+        selectors[1] = Selector.open();
+        subReactors[0] = new SubReactor(selectors[0]);
+        subReactors[1] = new SubReactor(selectors[1]);
+
         serverSocketChannel = ServerSocketChannel.open();
         InetSocketAddress inetSocketAddress = new InetSocketAddress(Config.HOST, Config.PORT);
         serverSocketChannel.socket().bind(inetSocketAddress);
         serverSocketChannel.configureBlocking(false);
         //第一个选择器监控accept
         masterReactor = Selector.open();
-        SelectionKey sk = serverSocketChannel.register(masterReactor, SelectionKey.OP_ACCEPT);
+        SelectionKey sk = serverSocketChannel.register(selectors[0], SelectionKey.OP_ACCEPT);
         sk.attach(new AcceptorHandler());
-
-        //一个反应堆对应一个子选择器
-        selectors[0] = Selector.open();
-        selectors[1] = Selector.open();
-        subReactors[0] = new SubReactor(selectors[0]);
-        subReactors[1] = new SubReactor(selectors[1]);
 
     }
 
@@ -83,8 +83,7 @@ public class MasterSlaveReactor {
                     Set<SelectionKey> selectionKeys = selector.selectedKeys();
                     Iterator<SelectionKey> iterator = selectionKeys.iterator();
                     while (iterator.hasNext()) {
-                        SelectionKey sk = iterator.next();
-                        dispatch(sk);
+                        dispatch((SelectionKey) (iterator.next()));
                     }
                     selectionKeys.clear();
                 }
@@ -102,7 +101,6 @@ public class MasterSlaveReactor {
     }
 
     public static void main(String[] args) throws IOException {
-        MasterSlaveReactor masterSlaveReactor = new MasterSlaveReactor();
-        masterSlaveReactor.startService();
+        new MasterSlaveReactor().startService();
     }
 }

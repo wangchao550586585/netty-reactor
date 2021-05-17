@@ -69,7 +69,13 @@ public class MasterSlaveReactorHandler implements Runnable {
             //取消监听的事件,这里注释是为了重复使用
 //            sk.cancel();
         } catch (IOException e) {
-
+            e.printStackTrace();
+            sk.cancel();
+            try {
+                socketChannel.finishConnect();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
