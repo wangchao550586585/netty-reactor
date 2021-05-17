@@ -19,11 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author WangChao
  * @create 2021/5/16 23:46
  */
-public class MasterSlaveReactor {
+public class MasterSlaveReactor implements  Runnable{
 
     Selector[] selectors = new Selector[2];
     SubReactor[] subReactors = new SubReactor[2];
-    Selector masterReactor;
+    Selector masterSelector;
     AtomicInteger next = new AtomicInteger(0);
     ServerSocketChannel serverSocketChannel;
 
@@ -40,15 +40,40 @@ public class MasterSlaveReactor {
         serverSocketChannel.socket().bind(inetSocketAddress);
         serverSocketChannel.configureBlocking(false);
         //第一个选择器监控accept
-        masterReactor = Selector.open();
-        SelectionKey sk = serverSocketChannel.register(selectors[0], SelectionKey.OP_ACCEPT);
+        masterSelector = Selector.open();
+        SelectionKey sk = serverSocketChannel.register(masterSelector, SelectionKey.OP_ACCEPT);
         sk.attach(new AcceptorHandler());
 
     }
 
     private void startService() {
         new Thread(subReactors[0]).start();
-//        new Thread(subReactors[1]).start();
+        new Thread(subReactors[1]).start();
+        run();
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (!Thread.interrupted()) {
+                masterSelector.select();
+                Set<SelectionKey> selectionKeys = masterSelector.selectedKeys();
+                Iterator<SelectionKey> iterator = selectionKeys.iterator();
+                while (iterator.hasNext()) {
+                    dispatch((SelectionKey) (iterator.next()));
+                }
+                selectionKeys.clear();
+            }
+        } catch (IOException e) {
+        }
+    }
+
+    private void dispatch(SelectionKey sk) {
+        Runnable handler = (Runnable) sk.attachment();
+        if (!Objects.isNull(handler)) {
+            handler.run();
+        }
+
     }
 
     class AcceptorHandler implements Runnable {
@@ -91,13 +116,7 @@ public class MasterSlaveReactor {
             }
         }
 
-        private void dispatch(SelectionKey sk) {
-            Runnable handler = (Runnable) sk.attachment();
-            if (!Objects.isNull(handler)) {
-                handler.run();
-            }
 
-        }
     }
 
     public static void main(String[] args) throws IOException {

@@ -42,6 +42,10 @@ public class MasterSlaveReactorHandler implements Runnable {
         selector.wakeup();
     }
 
+    /**
+     * 引入多线程后，会造成一个问题。就是重复处理多次。
+     * 这是因为当监听写事件时，因为是异步发送。所以造成会重复监听多次写事件。
+     */
     @Override
     public void run() {
         threadPoolExecutor.execute(new AsyncTask());
