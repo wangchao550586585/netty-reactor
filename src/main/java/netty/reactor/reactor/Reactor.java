@@ -100,6 +100,19 @@ final class Handler implements Runnable {
         //阻塞在select()方法上的线程会立马返回。
         //如果有其它线程调用了wakeup()方法，但当前没有线程阻塞在select()方法上，
         //下个调用select()方法的线程会立即“醒来（wake up）”。
+/*
+        主要作用
+            解除阻塞在Selector.select()/select(long)上的线程，立即返回。
+            两次成功的select之间多次调用wakeup等价于一次调用。
+            如果当前没有阻塞在select上，则本次wakeup调用将作用于下一次select——“记忆”作用。
+        为什么要唤醒？
+            注册了新的channel或者事件。
+            channel关闭，取消注册。
+            优先级更高的事件触发（如定时器事件），希望及时处理。
+        原理
+            Linux上利用pipe调用创建一个管道，Windows上则是一个loopback的tcp连接。这是因为win32的管道无法加入select的fd set，将管道或者TCP连接加入select fd set。
+            wakeup往管道或者连接写入一个字节，阻塞的select因为有I/O事件就绪，立即返回。可见，wakeup的调用开销不可忽视。
+        */
         sel.wakeup();
     }
 
@@ -107,8 +120,10 @@ final class Handler implements Runnable {
     public void run() {
         try {
             if (state == READING) {
+                System.out.println("Reading : ");
                 read();
             } else if (state == SENDING) {
+                System.out.println("Sending : ");
                 send();
             }
         } catch (IOException ex) {

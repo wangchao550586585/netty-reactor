@@ -53,6 +53,7 @@ public class MasterSlaveReactorHandler implements Runnable {
     private synchronized void asyncRun() {
         try {
             if (state == READING) {
+                System.out.println("Reading : ");
                 int length = 0;
                 while ((length = socketChannel.read(buffer)) > 0) {
                     System.out.println(new String(buffer.array(), 0, length));
@@ -61,6 +62,7 @@ public class MasterSlaveReactorHandler implements Runnable {
                 sk.interestOps(SelectionKey.OP_WRITE);
                 state = SENDING;
             } else if (state == SENDING) {
+                System.out.println("Sending : ");
                 socketChannel.write(buffer);
                 buffer.clear();
                 sk.interestOps(SelectionKey.OP_READ);

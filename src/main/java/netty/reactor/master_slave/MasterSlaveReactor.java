@@ -48,7 +48,7 @@ public class MasterSlaveReactor {
 
     private void startService() {
         new Thread(subReactors[0]).start();
-        new Thread(subReactors[1]).start();
+//        new Thread(subReactors[1]).start();
     }
 
     class AcceptorHandler implements Runnable {
