@@ -1,8 +1,8 @@
-package netty.reactor;
+package netty.reactor.master_slave;
+
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -12,6 +12,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 主从Reactor线程模型，handler
+ *
  * @author WangChao
  * @create 2021/5/17 0:49
  */
@@ -42,13 +44,41 @@ public class MasterSlaveReactorHandler implements Runnable {
 
     @Override
     public void run() {
-            threadPoolExecutor.execute(new AsyncTask());
+        threadPoolExecutor.execute(new AsyncTask());
+    }
+
+    /**
+     *异步线程处理，这里可能存在临界状态。
+     */
+    private synchronized void asyncRun() {
+        try {
+            if (state == READING) {
+                int length = 0;
+                while ((length = socketChannel.read(buffer)) > 0) {
+                    System.out.println(new String(buffer.array(), 0, length));
+                }
+                buffer.flip();
+                sk.interestOps(SelectionKey.OP_WRITE);
+                state = SENDING;
+            } else if (state == SENDING) {
+                socketChannel.write(buffer);
+                buffer.clear();
+                sk.interestOps(SelectionKey.OP_READ);
+                state = READING;
+            }
+            //取消监听的事件,这里注释是为了重复使用
+//            sk.cancel();
+        } catch (IOException e) {
+
+        }
     }
 
     class AsyncTask implements Runnable {
         @Override
         public void run() {
-
+            MasterSlaveReactorHandler.this.asyncRun();
         }
     }
+
+
 }

@@ -1,4 +1,6 @@
-package netty.reactor;
+package netty.reactor.reactor;
+
+import netty.reactor.Config;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -8,23 +10,28 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.Set;
 
 /**
- * R线程模型
+ * Reactor线程模型
+ * 单线程
  *
  * @author WangChao
  * @create 2021/5/16 22:51
  */
 public class Reactor implements Runnable {
+    public static void main(String[] args) throws IOException {
+        new Reactor().run();
+    }
+
     final Selector selector;
     final ServerSocketChannel serverSocket;
-    Reactor(int port) throws IOException {
+
+    Reactor() throws IOException {
         //Reactor初始化
         selector = Selector.open();
         serverSocket = ServerSocketChannel.open();
-        serverSocket.socket().bind(new InetSocketAddress(port));
+        serverSocket.socket().bind(new InetSocketAddress(Config.HOST, Config.PORT));
         //非阻塞
         serverSocket.configureBlocking(false);
         //与Selector一起使用时，Channel必须处于非阻塞模式下。
@@ -43,7 +50,7 @@ public class Reactor implements Runnable {
                 Iterator it = selected.iterator();
                 while (it.hasNext()) {
                     //Reactor负责dispatch收到的事件
-                    dispatch((SelectionKey)(it.next()));
+                    dispatch((SelectionKey) (it.next()));
                 }
                 selected.clear();
             }
@@ -52,7 +59,7 @@ public class Reactor implements Runnable {
 
     void dispatch(SelectionKey k) {
         //调用之前注册的callback对象
-        Runnable r = (Runnable)(k.attachment());
+        Runnable r = (Runnable) (k.attachment());
         if (r != null) {
             r.run();
         }
@@ -66,8 +73,7 @@ public class Reactor implements Runnable {
                 if (c != null) {
                     new Handler(selector, c);
                 }
-            }
-            catch(IOException ex) { /* ... */ }
+            } catch (IOException ex) { /* ... */ }
         }
     }
 }
@@ -75,8 +81,7 @@ public class Reactor implements Runnable {
 final class Handler implements Runnable {
     final SocketChannel socket;
     final SelectionKey sk;
-    ByteBuffer input = ByteBuffer.allocate(1024);
-    ByteBuffer output = ByteBuffer.allocate(1024);
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
     static final int READING = 0, SENDING = 1;
     int state = READING;
 
@@ -97,9 +102,6 @@ final class Handler implements Runnable {
         //下个调用select()方法的线程会立即“醒来（wake up）”。
         sel.wakeup();
     }
-    boolean inputIsComplete() { /* ... */  return false;}
-    boolean outputIsComplete() { /* ... */ return false; }
-    void process() { /* ... */ }
 
     @Override
     public void run() {
@@ -109,25 +111,41 @@ final class Handler implements Runnable {
             } else if (state == SENDING) {
                 send();
             }
-        } catch (IOException ex) { /* ... */ }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            sk.cancel();
+            try {
+                socket.finishConnect();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     void read() throws IOException {
-        socket.read(input);
-        if (inputIsComplete()) {
-            process();
-            state = SENDING;
-            // Normally also do first write now
-            //第三步,接收write事件
-            sk.interestOps(SelectionKey.OP_WRITE);
+        //从通道读
+        int length = 0;
+        while ((length = socket.read(buffer)) > 0) {
+            System.out.println((new String(buffer.array(), 0, length)));
         }
+        //读完后，准备开始写入通道,byteBuffer切换成读模式
+        buffer.flip();
+        //读完后，注册write就绪事件
+        sk.interestOps(SelectionKey.OP_WRITE);
+        //读完后,进入发送的状态
+        state = SENDING;
     }
+
     void send() throws IOException {
-        socket.write(output);
-        if (outputIsComplete()) {
-            //write完就结束了, 关闭select key
-            sk.cancel();
-        }
+        //写入通道
+        socket.write(buffer);
+        //写完后,准备开始从通道读,byteBuffer切换成写模式
+        buffer.clear();
+        //写完后,注册read就绪事件
+        sk.interestOps(SelectionKey.OP_READ);
+        //写完后,进入接收的状态
+        state = READING;
     }
 }
 

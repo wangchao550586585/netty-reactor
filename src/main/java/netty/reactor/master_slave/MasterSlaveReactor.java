@@ -1,4 +1,6 @@
-package netty.reactor;
+package netty.reactor.master_slave;
+
+import netty.reactor.Config;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -18,20 +20,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @create 2021/5/16 23:46
  */
 public class MasterSlaveReactor {
+
     Selector[] selectors = new Selector[2];
     SubReactor[] subReactors = new SubReactor[2];
-
+    Selector masterReactor;
     AtomicInteger next = new AtomicInteger(0);
     ServerSocketChannel serverSocketChannel;
 
 
     public MasterSlaveReactor() throws IOException {
         serverSocketChannel = ServerSocketChannel.open();
-        InetSocketAddress inetSocketAddress = new InetSocketAddress("127.0.0.1", 8081);
+        InetSocketAddress inetSocketAddress = new InetSocketAddress(Config.HOST, Config.PORT);
         serverSocketChannel.socket().bind(inetSocketAddress);
         serverSocketChannel.configureBlocking(false);
         //第一个选择器监控accept
-        SelectionKey sk = serverSocketChannel.register(selectors[0], SelectionKey.OP_ACCEPT);
+        masterReactor = Selector.open();
+        SelectionKey sk = serverSocketChannel.register(masterReactor, SelectionKey.OP_ACCEPT);
         sk.attach(new AcceptorHandler());
 
         //一个反应堆对应一个子选择器
@@ -52,7 +56,8 @@ public class MasterSlaveReactor {
         public void run() {
             try {
                 SocketChannel socketChannel = serverSocketChannel.accept();
-                if (Objects.isNull(socketChannel)) {
+                if (!Objects.isNull(socketChannel)) {
+                    //接收到请求创建新线程后，让子选择器进行监听处理。
                     new MasterSlaveReactorHandler(selectors[next.get()], socketChannel);
                 }
             } catch (IOException e) {
@@ -94,5 +99,10 @@ public class MasterSlaveReactor {
             }
 
         }
+    }
+
+    public static void main(String[] args) throws IOException {
+        MasterSlaveReactor masterSlaveReactor = new MasterSlaveReactor();
+        masterSlaveReactor.startService();
     }
 }
