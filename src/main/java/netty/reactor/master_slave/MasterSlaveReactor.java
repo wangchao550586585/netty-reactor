@@ -54,13 +54,17 @@ public class MasterSlaveReactor implements  Runnable{
 
     @Override
     public void run() {
+        execution(masterSelector);
+    }
+
+    private void execution(Selector selector) {
         try {
             while (!Thread.interrupted()) {
-                masterSelector.select();
-                Set<SelectionKey> selectionKeys = masterSelector.selectedKeys();
+                selector.select();
+                Set<SelectionKey> selectionKeys = selector.selectedKeys();
                 Iterator<SelectionKey> iterator = selectionKeys.iterator();
                 while (iterator.hasNext()) {
-                    dispatch((SelectionKey) (iterator.next()));
+                    dispatch(iterator.next());
                 }
                 selectionKeys.clear();
             }
@@ -102,18 +106,7 @@ public class MasterSlaveReactor implements  Runnable{
 
         @Override
         public void run() {
-            try {
-                while (!Thread.interrupted()) {
-                    selector.select();
-                    Set<SelectionKey> selectionKeys = selector.selectedKeys();
-                    Iterator<SelectionKey> iterator = selectionKeys.iterator();
-                    while (iterator.hasNext()) {
-                        dispatch((SelectionKey) (iterator.next()));
-                    }
-                    selectionKeys.clear();
-                }
-            } catch (IOException e) {
-            }
+            execution(selector);
         }
 
 
